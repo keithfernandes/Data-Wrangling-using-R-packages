@@ -1,0 +1,43 @@
+---
+title: "Keith Fernandes Profile"
+author: "Keith Fernandes"
+date: "March 9, 2019"
+output: html_document
+---
+
+```{r picture,echo = FALSE, warning=FALSE}
+url <- "https://media.licdn.com/dms/image/C4E03AQHPZ8Bz3uxd_w/profile-displayphoto-shrink_200_200/0?e=1557360000&v=beta&t=wXAoWvqKhjkqvbrygL4oPeuXqNhUjk0yUhxHyUyKYkM"
+
+
+```
+<center><img src="`r url`"></center>
+
+## Synopsis
+
+Hi I'm Keith, currently pursuing my Master's degree in Information Systems at UC.
+
+## Academic Background
+* University of Cincinnati, Carl H. Lindner College of Business	
+Master of Science in Information Systems                                                                                                       	
+
+* University of Mumbai 
+Bachelor of Engineering – Computer Science	
+
+## Professional Background
+
+With over 3 years of experience at TCS, working on application development, business reporting, data analysis and firefighting issues, I have gained expertise in software development and business intelligence. Working with a North American based banking client and dealing with its data on a daily basis helped me gain technical as well as domain knowledge of the banking sector. It has also made me well versed with the work culture of North American companies. I had to analyze and deal with large amounts of customer and mortgage data in order to prepare business reports, develop software applications and solve business problems and queries. In my 3 years I have worked on many projects in the banking and finance domain !
+
+
+## Experience with R
+
+I have experience with basics in R through the coursework I have taken up at UC.
+I know the basics in R as well as linear regression, anova testing etc.
+
+
+## Experience with other analytic software
+
+* SAS
+* Tableau
+* Python
+
+
