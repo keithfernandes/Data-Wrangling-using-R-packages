@@ -1,0 +1,628 @@
+---
+title: "Cincinnati Crime Analysis "
+author: "Keith Fernandes"
+date: "April 2, 2019"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r picture,echo = FALSE, warning=FALSE}
+url <- "http://www.coalitionfortheicc.org/sites/default/files/styles/column/public/noun_15302.png?itok=8BHOPLWQ&c=24f0631c54c0711bd8c8918cd6814768"
+
+
+```
+<center><img src="`r url`"></center>
+
+# {.tabset}
+## Introduction
+### Introduction
+Safety and security is a primary concern for every citizen. The crime rate 
+in a city is one of the most significant parameters to determine the quality
+of life offered in that city.
+
+A strong and effective law enforcement is the biggest deterrent to crime.
+Through the analysis of Cincinnati's crime data we can uncover new insights
+and facts of the criminal history of this city and assist law enforcement 
+agencies to optimally use their resources to prevent the maximum possible 
+incidents. This analysis can also help people searching for a locality to move
+into or a new property to purchase. It can be also used by surveillance 
+equipment manufacturers to identify areas with frequent crimes.
+
+For our solution to prevent crimes, our focus will be on the following :
+
+* Identify neighbourhoods with frequent occurrences of domestic violence.
+* Identify neighbourhoods with frequent occurrences of theft and robbery.
+* Identify time of the day and day of the week with the most number of crimes on
+   an average.
+* How many homicide cases do not have a suspect identified yet?
+* Where do most of the crimes take place( Ex: RESTAURANT,SCHOOL,HOSPITAL etc.)?
+* What proportion of crimes are hate crimes ?
+* Do males commit the most violent crimes?
+* How many crimes have resulted in arrests ?
+* What is the age range of most number of criminals ?
+
+
+We will be using dplyr select, filter and aggregation and grouping functions to
+gain answers to the questions above. We can also use machine learning models to 
+predict if a person can be a homicide suspect given age, location, gender etc.
+
+With the help of this analysis law enforcement agencies can know when and where
+to increase patrolling. If we can build an accurate predictive model
+to identify homicide suspects, we can reduce the effort required by law 
+enforcements to identify suspects.
+
+
+
+## Packages required
+### Packages required
+We would need to import the following R packages inorder to assist with the 
+importing and cleaning of our dataset.
+
+```{r midterm project, warning=FALSE,message=FALSE,error=FALSE}
+
+#1 Packages required
+library(readr) # to import the csv file
+library(dplyr) # to use functions like glimpse
+library(lubridate) #for date formatting
+library(DT)# to use the datatable function
+library(tidyverse)# for transformations
+library(ggplot2)# for EDA
+```
+
+## Data Preparation
+### Data Preparation
+Before we begin cleaning data, we need to import it as a dataframe in R.
+### Loading Data
+The data can be found at the following [link](https://www.dropbox.com/s/cpya6okvbopi81y/city_of_cincinnati_police_data_initiative_crime_incidents.csv?dl=1).
+Information about the data can be found 
+[here](https://data.cincinnati-oh.gov/Safer-Streets/PDI-Police-Data-Initiative-Crime-Incidents/k59e-2pvf).
+
+
+
+
+```{r Data Preparation Loading, warning=FALSE,message=FALSE,error=FALSE}
+
+#2 Data Preparation
+#Loading the data
+crime_data_initial <- 
+  read_csv("city_of_cincinnati_police_data_initiative_crime_incidents.csv",
+           col_names = TRUE)
+```
+#### View unclean dataset
+
+```{r Data Preparation Checking, warning=FALSE,message=FALSE,error=FALSE}
+#Check dimensions 
+dim(crime_data_initial)
+#Check column names are correct
+colnames(crime_data_initial)
+
+# Check the structure using dplyr function glimpse
+glimpse(crime_data_initial)
+#Check summary to identify NA's , outliers etc
+summary(crime_data_initial)
+
+```
+
+### Data cleaning
+
+From the above summary, we see what columns need to undergo data cleaning.
+As seen in the glimpse and summary of the dataset, we change the following as
+seen below:
+
+#### 1.
+Replace all na with 0 for total victims and suspects as we do not want to end up omiting
+criminal records in which no suspects were found or no victims identified.
+Also, replace with 0 where lat/long is unknown, we will replace them with 
+an approximate lat an lon  later  using R functions
+
+```{r Creating tidy data 1, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_initial$TOTALNUMBERVICTIMS[is.na(crime_data_initial$TOTALNUMBERVICTIMS)] <- 0
+crime_data_initial$TOTALSUSPECTS[is.na(crime_data_initial$TOTALSUSPECTS)] <- 0
+crime_data_initial$LATITUDE_X[is.na(crime_data_initial$LATITUDE_X)] <- 0
+crime_data_initial$LONGITUDE_X[is.na(crime_data_initial$LONGITUDE_X)] <- 0
+
+```
+#### 2.
+Column -  Theft code
+Now replace all NA in Theft code with NOT APPLICABLE as we do not want to end up omiting
+records which are not thefts when we use na.omit
+
+
+
+```{r Creating tidy data 2, warning=FALSE,message=FALSE,error=FALSE}
+unique(crime_data_initial$THEFT_CODE )
+crime_data_initial$THEFT_CODE[is.na(crime_data_initial$THEFT_CODE)] <- "NOT APPLICABLE"
+```
+
+</br>
+#### 3.
+Columns -   floor,side and opening
+floor,side and opening  are not applicable or all types of crimes
+
+
+
+
+```{r Creating tidy data 3, warning=FALSE,message=FALSE,error=FALSE}
+
+#1) FLOOR
+#check unique values floor
+
+unique(crime_data_initial$FLOOR)
+# multiple rows with same value but different number of spaces, remove unwanted spaces
+crime_data_initial$FLOOR <- gsub(" ", "", crime_data_initial$FLOOR, fixed = TRUE)
+#change NA to Not applicable
+crime_data_initial$FLOOR[is.na(crime_data_initial$FLOOR)] <- "NOT APPLICABLE"
+
+
+# 2) Side
+#check unique values side
+unique(crime_data_initial$SIDE)
+
+# multiple rows with same value but different number of spaces, remove unwanted spaces
+crime_data_initial$SIDE <- gsub(" ", "", crime_data_initial$SIDE, fixed = TRUE)
+
+# Replace ? with "6-UNKNOWN"
+crime_data_initial$SIDE[crime_data_initial$SIDE == "?"] <- "6-UNKNOWN"
+crime_data_initial$SIDE[is.na(crime_data_initial$SIDE)] <- "NOT APPLICABLE"
+
+# 3) Opening
+
+#check unique values side
+unique(crime_data_initial$OPENING)
+# multiple rows with same value but different number of spaces, remove unwanted spaces
+crime_data_initial$OPENING <- gsub(" ", "", crime_data_initial$OPENING, fixed = TRUE)
+# Replace ? with "6-UNKNOWN"
+crime_data_initial$OPENING[crime_data_initial$OPENING == "?"] <- "6-UNKNOWN"
+
+
+crime_data_initial$OPENING[is.na(crime_data_initial$OPENING)] <- "NOT APPLICABLE"
+```
+
+#### 4.
+Columns of Gender
+check unique values of gender
+
+
+```{r Creating tidy data 4, warning=FALSE,message=FALSE,error=FALSE}
+unique(crime_data_initial$SUSPECT_GENDER)
+unique(crime_data_initial$VICTIM_GENDER)
+```
+</br>
+As seen above we have to clean certain values.
+First we replace na with "UNKNOWN. Then, M - MALE with MALE & F - FEMALE with FEMALE
+Then replace"NON-PERSON (BUSINESS" with "NON-PERSON/BUSINESS".
+
+
+```{r Creating tidy data 5, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_initial$SUSPECT_GENDER[is.na(crime_data_initial$SUSPECT_GENDER)] <-
+  "UNKNOWN"
+crime_data_initial$VICTIM_GENDER[is.na(crime_data_initial$VICTIM_GENDER)] <-
+  "UNKNOWN"
+
+#replace M - MALE with MALE & F - FEMALE with FEMALE
+crime_data_initial$SUSPECT_GENDER[crime_data_initial$SUSPECT_GENDER == "M - MALE"] <-
+  "MALE"
+crime_data_initial$VICTIM_GENDER[crime_data_initial$VICTIM_GENDER == "M - MALE"] <-
+  "MALE"
+crime_data_initial$SUSPECT_GENDER[crime_data_initial$SUSPECT_GENDER == "F - FEMALE"] <-
+  "FEMALE"
+crime_data_initial$VICTIM_GENDER[crime_data_initial$VICTIM_GENDER == "F - FEMALE"] <-
+  "FEMALE"
+
+
+#replace"NON-PERSON (BUSINESS" with "NON-PERSON/BUSINESS"
+crime_data_initial$SUSPECT_GENDER[crime_data_initial$SUSPECT_GENDER == "NON-PERSON (BUSINESS"] <-
+  "NON-PERSON/BUSINESS"
+crime_data_initial$VICTIM_GENDER[crime_data_initial$VICTIM_GENDER == "NON-PERSON (BUSINESS"] <-
+  "NON-PERSON/BUSINESS"
+
+```
+#### 4.
+Columns of Race
+check unique values of gender
+
+```{r Creating tidy data 6, warning=FALSE,message=FALSE,error=FALSE}
+
+#Columns of Race
+#check unique values Race
+
+unique(crime_data_initial$SUSPECT_RACE)
+unique(crime_data_initial$VICTIM_RACE)
+```
+</br>
+As seen above we have to clean certain values.
+First we replace na with "UNKNOWN". 
+```{r Creating tidy data 7, warning=FALSE,message=FALSE,error=FALSE}
+
+
+
+#replace na with unknown
+crime_data_initial$SUSPECT_RACE[is.na(crime_data_initial$SUSPECT_RACE)] <-
+  "UNKNOWN"
+crime_data_initial$VICTIM_RACE[is.na(crime_data_initial$VICTIM_RACE)] <-
+  "UNKNOWN"
+
+```
+</br>
+Replace spelling errors/typos
+
+```{r Creating tidy data 8, warning=FALSE,message=FALSE,error=FALSE}
+
+
+crime_data_initial$SUSPECT_RACE[crime_data_initial$SUSPECT_RACE == "ASIAN OR PACIFIC ISL"] <-
+  "ASIAN/PACIFIC ISLAND"
+crime_data_initial$VICTIM_RACE[crime_data_initial$VICTIM_RACE == "ASIAN OR PACIFIC ISL"] <-
+  "ASIAN/PACIFIC ISLAND"
+
+crime_data_initial$SUSPECT_RACE[crime_data_initial$SUSPECT_RACE == "AMERICAN IINDIAN/ALA"] <-
+  "AMERICAN INDIAN/ALAS"
+crime_data_initial$VICTIM_RACE[crime_data_initial$VICTIM_RACE == "AMERICAN IINDIAN/ALA"] <-
+  "AMERICAN INDIAN/ALAS"
+
+```
+
+#### 5.
+Columns of Ethinicity
+check unique values Ethnicity
+
+```{r Creating tidy data 9, warning=FALSE,message=FALSE,error=FALSE}
+unique(crime_data_initial$SUSPECT_ETHNICITY)
+unique(crime_data_initial$VICTIM_ETHNICITY)
+```
+As seen above we have only NAs to clean here.
+We replace NA with "UNKNOWN"
+
+```{r Creating tidy data 10, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_initial$SUSPECT_ETHNICITY[is.na(crime_data_initial$SUSPECT_ETHNICITY)]<-
+  "UNKNOWN"
+crime_data_initial$VICTIM_ETHNICITY[is.na(crime_data_initial$VICTIM_ETHNICITY)]<-
+  "UNKNOWN"
+
+```
+Drop 1st column INSTANCEID as it is only a row identifier, DROP day of week as
+ it is not required for analysis
+
+```{r Creating tidy data 11, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_initial <- crime_data_initial[,-1]
+crime_data_initial<-  subset(crime_data_initial, select= -DAYOFWEEK)
+```
+</br>
+Drop unclean zipcodes.
+
+```{r Creating tidy data 12, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_initial$ZIP[crime_data_initial$ZIP > 99999 ] <- NA
+```
+delete all na records
+
+```{r Creating tidy data 13, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_no_na <- na.omit(crime_data_initial)
+```
+Convert data types found to be incorrect as per glimpse and summary output
+Delete any records having conversion error resulting in NA coercion
+this is because there were 326 alphanumeruc incident numbers
+
+
+```{r Creating tidy data 14, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_no_na$INCIDENT_NO  <- as.numeric(crime_data_no_na$INCIDENT_NO) 
+crime_data_no_na <- na.omit(crime_data_no_na)
+```
+
+#### 6.
+Format all date and time columns
+
+```{r Creating tidy data 15, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_no_na$DATE_REPORTED <- mdy_hms(crime_data_no_na$DATE_REPORTED)
+crime_data_no_na$DATE_FROM <- mdy_hms(crime_data_no_na$DATE_FROM)
+crime_data_no_na$DATE_TO <- mdy_hms(crime_data_no_na$DATE_TO)
+crime_data_no_na$DATE_OF_CLEARANCE <-
+  mdy_hms(crime_data_no_na$DATE_OF_CLEARANCE)
+
+```
+
+#### 7.
+Rename columns which are not named correctly.
+```{r Creating tidy data 16, warning=FALSE,message=FALSE,error=FALSE}
+#Rename CLSD to Clearances
+names(crime_data_no_na)[5] <- "CLEARANCES"
+
+#Rename VICTIM_AGE to VICTIM_AGE_RANGE
+colnames(crime_data_no_na)[colnames(crime_data_no_na) == "VICTIM_AGE"] <-
+  "VICTIM_AGE_RANGE"
+
+#Rename SUSPECT_AGE TO SUSPECT_AGE_RANGE
+colnames(crime_data_no_na)[colnames(crime_data_no_na) == "SUSPECT_AGE"] <- "SUSPECT_AGE_RANGE"
+```
+Separate dates to date and time
+
+
+```{r Creating tidy data 17, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_mutated <-
+  mutate(crime_data_no_na,
+         REPORTED_DATE  = format(crime_data_no_na$DATE_REPORTED, "%m/%d/%Y") ,
+         REPORTED_TIME  = format(crime_data_no_na$DATE_REPORTED, "%H:%M:%S"),
+         FROM_DATE = format(crime_data_no_na$DATE_FROM, "%m/%d/%Y") ,
+         FROM_TIME = format(crime_data_no_na$DATE_FROM, "%H:%M:%S"),
+         TO_DATE = format(crime_data_no_na$DATE_TO, "%m/%d/%Y") ,
+         TO_TIME = format(crime_data_no_na$DATE_TO, "%H:%M:%S"),
+         CLEARANCE_DATE  = format(crime_data_no_na$DATE_OF_CLEARANCE , "%m/%d/%Y") ,
+         CLEARANCE_TIME  = format(crime_data_no_na$DATE_OF_CLEARANCE , "%H:%M:%S"),
+         
+         
+  )
+
+```
+
+</br>
+Clear old objects
+
+```{r Creating tidy data 18, warning=FALSE,message=FALSE,error=FALSE}
+rm(crime_data_initial,crime_data_no_na)
+```
+</br>
+Drop unrequired date columns which we just mutated. Also drop HOUR_FROM
+and HOUR_TO as this info is already present in FROM_TIME and TO_TIME
+
+```{r Creating tidy data 19, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_mutated <-
+  subset(crime_data_mutated, select=-c(DATE_REPORTED,DATE_FROM,DATE_TO,
+                                       DATE_OF_CLEARANCE,HOUR_FROM,HOUR_TO
+  ))
+```
+</br>
+Convert all column names to lower case
+
+```{r Creating tidy data 20, warning=FALSE,message=FALSE,error=FALSE}
+names(crime_data_mutated) <- tolower(names(crime_data_mutated)) 
+```
+</br>
+Verify if any NA values still present
+```{r Creating tidy data 21, warning=FALSE,message=FALSE,error=FALSE}
+sum(is.na(crime_data_mutated))
+
+```
+
+Now we create our final clean dataset. 
+We will view this dataset using the datatable function.
+Description of few fields which are abbreviated or not commonly known :
+
+1. FROM_DATE : Date at which incident began
+2. FROM_TIME : Time at which incident began
+3. TO_DATE   : Date at which incident ended
+4. TO_TIME   : Time at which incident ended
+5. DST       : Designated Surveillance territory
+6. BEAT      : territory for patrolling from a police officer
+7. UCR       : uniform crime report
+
+
+Now display our final clean dataset. Display only 1st 100 rows to prevent
+crashing of R studio
+
+```{r View clean dataset, warning=FALSE,message=FALSE,error=FALSE}
+dim(crime_data_mutated)
+datatable(head(crime_data_mutated,100))
+
+```
+
+
+
+## Exploratory Data Analysis
+### Exploratory Data Analysis
+
+Now that we have successfully cleant the data, we will start to answer our questions.
+
+### Identify neighbourhoods with frequent occurrences of domestic violence.
+
+Using ggplot and geom_col we will create a chart to plot
+neighbourhoods with frequent occurrences of domestic violence.
+```{r EDA1, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_mutated  %>%
+  filter(offense == "DOMESTIC VIOLENCE") %>%
+  count(cpd_neighborhood,sort = TRUE) %>%
+  filter(n > 250) %>%
+  mutate(cpd_neighborhood = reorder(cpd_neighborhood, n)) %>%
+  ggplot(aes(cpd_neighborhood, n)) +
+  geom_col(fill = "#FFA07A") +
+  xlab(NULL)+
+  ylab("No. of reports") +
+  theme_minimal()+
+  coord_flip()
+```
+
+As seen above, the neighbourhoods of Westwood, West & East price hill show high
+incidents of domestic violence. We need to keep a helpline number and also make
+people aware of the issues of domestic violence and how they can seek legal help or
+counselling.
+
+### Identify neighbourhoods with frequent occurrences of theft and robbery.
+
+                                                                       
+Using ggplot and geom_col we will create another chart to plot
+neighbourhoods with frequent occurrences of theft and robbery.
+
+
+```{r EDA2, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_mutated  %>%
+  filter(offense == "ROBBERY" | offense == "THEFT"  | offense ==  "BURGLARY" ) %>%
+  count(cpd_neighborhood,sort = TRUE) %>%
+  filter(n > 5000) %>%
+  mutate(cpd_neighborhood = reorder(cpd_neighborhood, n)) %>%
+  ggplot(aes(cpd_neighborhood, n) ) +
+  geom_col(fill = "lightblue") +
+  xlab(NULL)+
+  ylab("No. of Theft incidents") +
+  theme_minimal()+
+  coord_flip()
+```
+
+As seen above, Westwood, CBD river front have most number of thefts.
+The high number of thefts in CBD river front may be attributed to it being a 
+tourist area. Also, the interesting thing to note, all the neighbourhoods having
+a high occurances of domestic violence, are all present in this list.
+
+### Crimes as a function of time
+
+We create a line graph using geom_line() to plot the number of occurances of crime
+by the hour.
+```{r EDA3, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_mutated  %>%
+  mutate(hour = format(strptime(from_time,"%H:%M:%S"),'%H') ) %>%
+  count(hour) %>%
+  ggplot(aes(x = hour, y =  n,group = 1) ) +
+  geom_line(colour = "red",size = 5)+
+  geom_point(size = 5)+
+  xlab("Hour of the day")+
+  ylab("No. of  incidents") +
+  theme_classic()
+
+```
+
+As seen in the graph above, 5 - 12 AM has the most occurances of crime. It is 
+better to take precautions while venturing out during these hours. Also, 
+interesting to note is that there is a huge spike of crimes at 12 PM in the noon.
+
+
+### Homicide cases without suspects identified
+
+```{r EDA4, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_mutated  %>%
+  filter(ucr_group == "HOMICIDE" ) %>%
+  mutate(hasSuspects = ifelse(totalsuspects>0, "YES" ,"NO") )%>%
+  count(hasSuspects) %>%
+  ggplot( aes(hasSuspects, n, fill=hasSuspects)) +
+  geom_bar(stat = "identity",size = 3)+
+  ggtitle("Homicide cases without suspects idetified") +
+  xlab("Suspects identified ") +
+  ylab("No of cases")
+```
+
+This is an interesting plot, it shows us nearly half of the homicide cases in
+Cincinnati has no supects identified. There needs to be an improvement in criminal
+investigation methodology at the Cincinnati Police Department.
+
+### Where do most of the crimes take place(RESTAURANT,SCHOOL,HOSPITAL etc.)?
+
+```{r EDA5, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_mutated  %>%
+   count(location,sort = TRUE) %>%
+  top_n(8) %>%
+  mutate(location = reorder(location, n)) %>%
+  ggplot(aes(location, n)) +
+  geom_col(fill = "#410f51") +
+  xlab(NULL)+
+  ylab("No. of crimes") +
+  theme_classic()+
+  coord_flip()
+
+```
+
+Even though it looks like most of the crime are occuring on the street.
+The next 6 bars, all denote different type of homes and areas around places of residence
+like a parking lot or yard. This shows, compared to any street the home is the most
+unsafest place to be !
+
+
+### What proportion of crimes are hate crimes ?
+
+```{r EDA6, warning=FALSE,message=FALSE,error=FALSE}
+crime_data_mutated  %>%
+  mutate(hatecrime = ifelse(hate_bias == "N--NO BIAS/NOT APPLICABLE","No","Yes") ) %>%
+  count(hatecrime,sort = TRUE) %>%
+  ggplot( aes(hatecrime, n, fill=hatecrime)) +
+  geom_bar(stat = "identity",size = 3)+
+  ggtitle("Proportion of hate crimes") +
+  xlab("Hate Crime ? ") +
+  ylab("No of cases")
+
+```
+
+As seen above, most the crimes are not hate crimes. This may be due to the fact that
+most of the crimes are thefts and robberies which have mostly a financial motive.
+
+### Do males commit the most violent crimes?
+
+There is a notion of males having a higher tendency to commit violent crimes
+like homicide and assaults. Let us see through our data whether this is true.
+
+```{r EDA7, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_mutated  %>%
+  filter(ucr_group == "HOMICIDE" | ucr_group == "AGGRAVATED ASSAULTS") %>%
+  filter(suspect_gender == "MALE" | suspect_gender == "FEMALE") %>%
+  count(suspect_gender) %>%
+  ggplot( aes(suspect_gender, n, fill=suspect_gender)) +
+  geom_bar(stat = "identity",size = 3)+
+  ggtitle("Violent crime tendency by Gender") +
+  xlab("Gender") +
+  ylab("No of violent crimes")
+```
+
+As seen above, Males do commit the most violent crimes by a far margin.
+
+### How many crimes have resulted in arrests ?
+
+There is a notion of males having a higher tendency to commit violent crimes
+like homicide and assaults. Let us see through our data whether this is true.
+
+```{r EDA8, warning=FALSE,message=FALSE,error=FALSE}
+
+crime_data_mutated  %>%
+  mutate(arrests = ifelse(grepl("CLEARED BY ARREST", crime_data_mutated$clearances),"Yes","No")) %>%
+  count(arrests) %>%
+  ggplot( aes(arrests, n, fill=arrests)) +
+  geom_bar(stat = "identity",size = 3)+
+  ggtitle("Proportion of arrests") +
+  xlab("Arrested ?") +
+  ylab("No of cases")+
+  theme_classic()
+
+```
+
+As seen above there are a large number of crimes where no arrests have been made.
+
+### Age range and crimes
+
+What is the proportion of crimes commited by different age groups ?
+
+```{r EDA9, warning=FALSE,message=FALSE,error=FALSE}
+
+
+crime_data_mutated  %>%
+  count(suspect_age_range)%>%
+  filter(!suspect_age_range == "UNKNOWN") %>%
+  mutate(suspect_age_range = reorder(suspect_age_range, n)) %>%
+  ggplot(aes(x=suspect_age_range, y=n)) + 
+  geom_col(fill = "#176770")+
+  ggtitle("Age range and Crimes") +
+  xlab(" Suspect Age bracket") +
+  ylab("No of criminal cases")+
+  coord_flip()
+```
+
+As seen above, 18-25 range shows the most criminal tendencies.
+The crime rate decrease as adults get older than 25.
+Old people above 70 are the least criminal, but young people below 18 are not !
+
+## Summary
+### Summary
+
+The dataset had a lot of issues and many unclean values. With the help of powerful
+R packages we were able to clean more than 300,000 rows within seconds. This would not
+have been possible with other tools like excel that easily.
+The Exploratory data analysis helped us uncover many new insights. 
+We have learnt where we need to tread cautiously and at what time of the day we should not 
+venture outside. It also showed us that many homicide cases have no suspects yet.
+We hope justice comes one day to these victims.
+Overall, this analysis helped us get a glimpse of the criminal underbelly of Cincinnati !
+
+
+
+
